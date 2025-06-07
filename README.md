@@ -6,9 +6,13 @@ cd my-vue-app1
 
 pnpm i
 
+pnpm dev
+
 cd my-vue-app2
 
 pnpm i
+
+pnpm dev
 
 ## 页面
 ![alt text](image.png)
