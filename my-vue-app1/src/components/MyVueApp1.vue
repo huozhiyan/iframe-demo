@@ -1,50 +1,41 @@
-<script setup lang="ts">
+<script setup>
 import { ref, onBeforeUnmount } from "vue";
+import { useIframeCommunication } from "../../../utils/iframeCommunication.ts";
 
-defineProps<{ msg: string }>();
-
-// iframe 的引用，用于后续向子应用发送消息
+// iframe 的 DOM 引用
 const iframeRef = ref(null);
-// 用于存储从子应用 app2 接收到的消息
+// 存储从子应用收到的消息
 const childMessage = ref("");
 
-// 向子应用 app2 发送消息的方法
-const sendToApp2 = () => {
-  iframeRef.value.contentWindow.postMessage(
-    {
-      type: "FROM_PARENT", // 消息类型标识
-      data: "我是app1，收到请回答，收到请回答！", // 发送的内容
-    },
-    // 指定允许接收消息的目标源（安全性考虑）
-    "http://localhost:5174"
-  );
-};
-
-// 处理从子应用 app2 接收到的消息
-const handleMessageFromChild = (event) => {
-  // 安全校验，只处理来自指定源的消息
-  if (event.origin !== "http://localhost:5174") return;
-
-  // 判断消息类型，若为 FROM_CHILD，则更新 childMessage
-  if (event.data.type === "FROM_CHILD") {
-    childMessage.value = event.data.data;
-  }
-};
-
-// iframe 加载完成时，监听 window 的 message 事件
+// iframe 加载完成后，设置通信目标窗口为子应用 iframe
 const onIframeLoad = () => {
-  window.addEventListener("message", handleMessageFromChild);
+  setTargetWindow(iframeRef.value.contentWindow);
 };
 
-// 组件卸载前移除事件监听，防止内存泄漏（已注释，可根据需要启用）
+// 初始化通信工具，allowedOrigin 限定只接收来自子应用的消息
+const { send, on, destory, setTargetWindow } = useIframeCommunication({
+  allowedOrigin: "http://localhost:5174",
+});
+
+// 注册消息监听，收到子应用消息时更新 childMessage
+on("FROM_CHILD", (data) => {
+  childMessage.value = data;
+});
+
+// 向子应用发送消息
+const sendToApp2 = () => {
+  send("FROM_PARENT", "我是app1，收到请回答，收到请回答！");
+};
+
+// 组件卸载时销毁通信实例，移除事件监听
 onBeforeUnmount(() => {
-  window.removeEventListener("message", handleMessageFromChild);
+  destory();
 });
 </script>
 
 <template>
   <div>
-    <h2>{{ msg }}</h2>
+    <h2>我是my-vue-app1</h2>
     <!-- 按钮：点击后向子应用发送消息 -->
     <button @click="sendToApp2">app1发送消息给app2</button>
     <!-- 展示从子应用接收到的消息 -->
@@ -53,7 +44,7 @@ onBeforeUnmount(() => {
   <!-- 嵌入子应用的 iframe，加载完成后绑定事件监听 -->
   <iframe
     ref="iframeRef"
-    src="http://localhost:5174/"
+    src="http://localhost:5174"
     @load="onIframeLoad"
     frameborder="0"
   ></iframe>
